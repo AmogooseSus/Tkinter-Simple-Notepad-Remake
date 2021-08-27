@@ -16,6 +16,8 @@ class App(Tk):
         self.current_file = None
         # To keep track of the current textsize in the editor
         self.textsize = 12
+        self.max_textsize = 24
+        self.min_textsize = 8
         # initlise winodw properties
         self.setup_window()
         # initlise the widgets for the editor
@@ -35,13 +37,16 @@ class App(Tk):
         self.textarea.place(relheight=1.0, relwidth=1.0)
 
     def changetext_size(self, event):
-        wheel_rotation = event.delta % 120
+        wheel_rotation = event.delta
         print(wheel_rotation)
-        if wheel_rotation == 1:
-            self.textsize += 2
-        else:
-            self.textsize -= 2
+        self.textsize = self.clamp(self.textsize, self.min_textsize, self.max_textsize,
+                                   self.textsize + (1 if wheel_rotation == 120 else -1))
         self.textarea["font"] = ("Helvetica", self.textsize)
+
+    def clamp(self, val, min, max, change_val):
+        if change_val < min or change_val > max:
+            return val
+        return change_val
 
 
 if __name__ == "__main__":

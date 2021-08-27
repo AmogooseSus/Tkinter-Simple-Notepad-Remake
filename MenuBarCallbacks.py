@@ -46,7 +46,10 @@ class MenuBar:
         self.menubar.add_cascade(label="File", menu=self.file_menu)
 
     def new_area(self, e=None):
-        pass
+        if not self.check_hassaved():
+            self.generate_savewarning()
+        self.open_file_helper(None, None)
+        self.textarea.delete("1.0", END)
 
     def new_window(self, e=None):
         pass
@@ -108,7 +111,8 @@ class MenuBar:
     def open_file_helper(self, dir, name):
         self.root.currently_opened = dir
         self.root.currently_filename = name
-        self.root.title(f'{name} - Notepad')
+        self.root.title(name if self.root.currently_opened !=
+                        None else "Untitled" + " - " + "Notepad")
 
     def check_hassaved(self):
         if self.root.currently_opened == None:
