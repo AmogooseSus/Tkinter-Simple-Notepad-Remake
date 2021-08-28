@@ -33,16 +33,20 @@ class App(Tk):
 
     def generate_textarea(self):
         self.textarea = ScrolledText(self, font=(
-            "Helvetica", self.textsize))
+            "Helvetica", self.textsize), undo=True, maxundo=-1)
+        # relative units used to ensure textarea always takes up same space
+        # regardless of window size
         self.textarea.place(relheight=1.0, relwidth=1.0)
 
     def changetext_size(self, event):
+        # returns 120 if scrolling up , -120 if down
         wheel_rotation = event.delta
-        print(wheel_rotation)
+        # sets the textsize to a clamped value
         self.textsize = self.clamp(self.textsize, self.min_textsize, self.max_textsize,
                                    self.textsize + (1 if wheel_rotation == 120 else -1))
         self.textarea["font"] = ("Helvetica", self.textsize)
 
+    # function ensure that values are clamped between min and max
     def clamp(self, val, min, max, change_val):
         if change_val < min or change_val > max:
             return val
