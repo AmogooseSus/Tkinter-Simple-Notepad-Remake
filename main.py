@@ -33,7 +33,7 @@ class App(Tk):
 
     def generate_textarea(self):
         self.textarea = ScrolledText(self, font=(
-            "Helvetica", self.textsize), undo=True, maxundo=-1)
+            "Helvetica", self.textsize), undo=True, maxundo=-1, wrap=WORD)
         # relative units used to ensure textarea always takes up same space
         # regardless of window size
         self.textarea.place(relheight=1.0, relwidth=1.0)

@@ -1,6 +1,8 @@
 from tkinter import Menu
 import tkinter
+from tkinter.constants import NS
 import tkinter.filedialog as fd
+from tkinter import ttk
 from tkinter import END
 from tkinter.messagebox import *
 import re
@@ -10,6 +12,7 @@ import os
 
 def generate_menudata_dict(name, callback_func, keyboard_shortcut):
     return {"Name": name, "Callback": callback_func, "Shortcut": keyboard_shortcut}
+
 
 # class to manage all functions related to the menubaar
 
@@ -25,17 +28,21 @@ class MenuBar:
             generate_menudata_dict(
                 "New Control-N", self.new_area, "<Control-n>"),
             generate_menudata_dict(
-                "New Window Control-Shift-N", self.new_window, "<Control-Shift-n>"),
+                "New Window Control-Shift-N", self.new_window, "<Control-Shift-KeyPress-n>"),
             generate_menudata_dict(
                 "Open Control-o", self.open_file, "<Control-o>"),
             generate_menudata_dict("Save Control-S", self.save, "<Control-s>"),
             generate_menudata_dict(
-                "Save As Control-Shift-S", self.save_as, "<Control-Shift-s>"),
+                "Save As Control-Shift-S", self.save_as, "<Control-Shift-KeyPress-s>"),
             generate_menudata_dict("Exit Control-E", self.exit, "<Control-e>")
         ]
+        self.editmenu_data = [generate_menudata_dict(
+            "Find", self.find, "<Control-f>"), generate_menudata_dict("Replace", self.replace, "<Control-r>")]
         self.create_visuals()
         # bind the red cross close to the exit function
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
+        # used to keep track for the find function
+        self.last_line_checked = 0
 
     def create_visuals(self):
         # Set up a menu bar and link it with the main window
@@ -49,8 +56,15 @@ class MenuBar:
             self.file_menu.add_command(label=x["Name"], command=x["Callback"])
             self.root.bind(x["Shortcut"], x["Callback"])
 
+        # create the edit menu and its items
+        self.edit_menu = Menu(self.menubar, tearoff=False)
+        for x in self.editmenu_data:
+            self.edit_menu.add_command(label=x["Name"], command=x["Callback"])
+            self.root.bind(x["Shortcut"], x["Callback"])
+
         # add the item to the menubar
         self.menubar.add_cascade(label="File", menu=self.file_menu)
+        self.menubar.add_cascade(label="Edit", menu=self.edit_menu)
 
     def new_area(self, e=None):
         if not self.check_hassaved():
@@ -113,6 +127,10 @@ class MenuBar:
         self.filename = tkinter.StringVar()
         self.inputbox = inputbox(
             "File Name Request", "Please enter a filename", self.root, self.filename)
+        if self.filename.get() == "None":
+            print("Input box closed")
+            return
+
         self.directory = fd.askdirectory()
         # sets the location to the dir and filename concatnated with "/"
         self.location = f'{self.directory}/{self.filename.get()}.txt'
@@ -174,3 +192,114 @@ class MenuBar:
             "File not Saved", "Would you like to save?")
         if self.warning == True:
             self.save()
+
+    def find(self, e=None):
+        find_window = tkinter.Toplevel(self.root)
+        find_window.geometry("250x50")
+        find_window.resizable(0, 0)
+
+        find_window.columnconfigure(0, weight=2)
+        find_window.columnconfigure(1, weight=1)
+
+        find_value = tkinter.StringVar()
+        find_entry = ttk.Entry(find_window, textvariable=find_value)
+        find_entry.grid(row=0, column=0, sticky=NS, pady=10)
+        # ensures when user changes the find input the line to check is reset
+        find_value.trace("w", self.reset_line_check)
+
+        find_btn = ttk.Button(find_window, text="Find/ Find Next")
+        find_btn.grid(row=0, column=1, sticky=NS, pady=10)
+        find_btn["command"] = lambda: self.find_algo(find_value)
+
+        find_window.protocol("WM_DELETE_WINDOW",
+                             lambda: self.handle_findclose(find_window))
+
+    def reset_line_check(self, a=None, b=None, c=None):
+        self.last_line_checked = 0
+
+    # allows you to find a word(s) in the text line by line
+    def find_algo(self, input):
+        # gets rid of the highlight(s) on the previous line
+        self.textarea.tag_delete("search")
+        # gets the string value of text and gets rid of any whitespace
+        input_filtered = input.get().strip()
+        # check if we even have any valid input
+        if input_filtered == "":
+            return
+
+        # get the total amount of lines to search through
+        total_lines = int(self.root.textarea.index('end-1c').split('.')[0])
+
+        # ensure we don't check beyond lines that don't exist
+        if self.last_line_checked >= total_lines:
+            # back to the first line
+            self.last_line_checked = 1
+        else:
+            # increment so we can check the next line
+            self.last_line_checked += 1
+
+        # get the text from the line we have to check
+        line_to_check = self.textarea.get(
+            f'{self.last_line_checked}.0', f'{self.last_line_checked}.{END}')
+        entire_text = self.textarea.get("1.0", END).strip()
+        # use reg exp and set the value to the text user wants to find
+        pattern = re.compile(input_filtered)
+
+        # check if this line even has the desired word(s) and if so highlight them
+        if pattern.search(line_to_check):
+            # variables to store word information for text widget
+            word_startline = self.last_line_checked
+            word_startcol = 0
+            word_endcol = 0
+            word = ""
+            # loop every index of each character in the line
+            for x in range(len(line_to_check)):
+                """
+                if the character is a whitespace (meaning we've passed a word)
+                reset the word var to an empty string
+                and set the start_col to the current index of the character + 1
+                and continue to the iteration 
+                """
+                if line_to_check[x] == " ":
+                    word = ""
+                    word_startcol = x + 1
+                    continue
+                # add the current character to the word
+                word += line_to_check[x]
+                # if the word is == to the user requested word
+                if word == input_filtered:
+                    # set the end column to the current index
+                    word_endcol = x + 1
+                    print(f'{word_startline}.{word_startcol}',
+                          f'{word_startline}.{word_endcol}')
+                    # add a tag to that section of the text
+                    self.textarea.tag_add(
+                        "search", f'{word_startline}.{word_startcol}', f'{word_startline}.{word_endcol}')
+                    # change that section of texts properties to highlight it as important
+                    self.textarea.tag_config("search", background="yellow",
+                                             foreground="blue")
+
+                    # Go to the highlighted word and move the users cursor there
+                    self.textarea.mark_set(
+                        "insert", f'{word_startline}.{word_startcol}')
+                    self.textarea.see(f'{word_startline}.{word_startcol}')
+
+                    # reset the word and start col to the next char incase the word appears multiple times
+                    word = ""
+                    word_startcol = x + 1
+            # to stop the recursion
+            return
+        # to ensure user is directed to the next occurence of the word rather than having to manually get to it line by line
+        # and ensures that the word they're looking for is even in the entire text
+        elif pattern.search(entire_text):
+            self.find_algo(input)
+        else:
+            showerror("Word not found",
+                      "The word could not be found in the file")
+
+    def handle_findclose(self, find_window):
+        self.textarea.tag_delete("search")
+        find_window.destroy()
+
+    def replace(self, e=None):
+        pass
