@@ -1,6 +1,6 @@
 from tkinter import Menu
 import tkinter
-from tkinter.constants import NS
+from tkinter.constants import EW, NS, NSEW
 import tkinter.filedialog as fd
 from tkinter import ttk
 from tkinter import END
@@ -37,7 +37,11 @@ class MenuBar:
             generate_menudata_dict("Exit Control-E", self.exit, "<Control-e>")
         ]
         self.editmenu_data = [generate_menudata_dict(
-            "Find", self.find, "<Control-f>"), generate_menudata_dict("Replace", self.replace, "<Control-r>")]
+            "Find Control-F", self.find, "<Control-f>"),
+            generate_menudata_dict("Replace Control-H",
+                                   self.replace, "<Control-h>"),
+            generate_menudata_dict("Go To Control-G", self.Go_to, "<Control-g>")]
+
         self.create_visuals()
         # bind the red cross close to the exit function
         self.root.protocol("WM_DELETE_WINDOW", self.exit)
@@ -197,6 +201,7 @@ class MenuBar:
         find_window = tkinter.Toplevel(self.root)
         find_window.geometry("250x50")
         find_window.resizable(0, 0)
+        find_window.grab_current()
 
         find_window.columnconfigure(0, weight=2)
         find_window.columnconfigure(1, weight=1)
@@ -209,7 +214,8 @@ class MenuBar:
 
         find_btn = ttk.Button(find_window, text="Find/ Find Next")
         find_btn.grid(row=0, column=1, sticky=NS, pady=10)
-        find_btn["command"] = lambda: self.find_algo(find_value)
+        find_btn["command"] = lambda: self.find_word(
+            find_value, self.highlight_words)
 
         find_window.protocol("WM_DELETE_WINDOW",
                              lambda: self.handle_findclose(find_window))
@@ -218,7 +224,7 @@ class MenuBar:
         self.last_line_checked = 0
 
     # allows you to find a word(s) in the text line by line
-    def find_algo(self, input):
+    def find_word(self, input, action_to_peform_onword):
         # gets rid of the highlight(s) on the previous line
         self.textarea.tag_delete("search")
         # gets the string value of text and gets rid of any whitespace
@@ -272,17 +278,20 @@ class MenuBar:
                     word_endcol = x + 1
                     print(f'{word_startline}.{word_startcol}',
                           f'{word_startline}.{word_endcol}')
-                    # add a tag to that section of the text
-                    self.textarea.tag_add(
-                        "search", f'{word_startline}.{word_startcol}', f'{word_startline}.{word_endcol}')
-                    # change that section of texts properties to highlight it as important
-                    self.textarea.tag_config("search", background="yellow",
-                                             foreground="blue")
 
-                    # Go to the highlighted word and move the users cursor there
-                    self.textarea.mark_set(
-                        "insert", f'{word_startline}.{word_startcol}')
-                    self.textarea.see(f'{word_startline}.{word_startcol}')
+                    action_to_peform_onword(f'{word_startline}.{word_startcol}',
+                                            f'{word_startline}.{word_endcol}')
+                    # add a tag to that section of the text
+                    # self.textarea.tag_add(
+                    #     "search", f'{word_startline}.{word_startcol}', f'{word_startline}.{word_endcol}')
+                    # # change that section of texts properties to highlight it as important
+                    # self.textarea.tag_config("search", background="yellow",
+                    #                          foreground="blue")
+
+                    # # Go to the highlighted word and move the users cursor there
+                    # self.textarea.mark_set(
+                    #     "insert", f'{word_startline}.{word_startcol}')
+                    # self.textarea.see(f'{word_startline}.{word_startcol}')
 
                     # reset the word and start col to the next char incase the word appears multiple times
                     word = ""
@@ -292,14 +301,83 @@ class MenuBar:
         # to ensure user is directed to the next occurence of the word rather than having to manually get to it line by line
         # and ensures that the word they're looking for is even in the entire text
         elif pattern.search(entire_text):
-            self.find_algo(input)
+            self.find_word(input, action_to_peform_onword)
         else:
             showerror("Word not found",
                       "The word could not be found in the file")
 
+    # highlights words based on their position in textarea
+    def highlight_words(self, start, end):
+        # add a tag to that section of the text
+        self.textarea.tag_add(
+            "search", start, end)
+        # change that section of texts properties to highlight it as important
+        self.textarea.tag_config("search", background="yellow",
+                                 foreground="blue")
+
+        # Go to the highlighted word and move the users cursor there
+        self.textarea.mark_set(
+            "insert", start)
+        self.textarea.see(start)
+
     def handle_findclose(self, find_window):
+        # get rid of any highlted text
         self.textarea.tag_delete("search")
+        self.reset_line_check()
+        # close the window
         find_window.destroy()
 
+    # handles replace window
     def replace(self, e=None):
+        # UI
+        replace_window = tkinter.Toplevel(self.root)
+        replace_window.geometry("350x100")
+        replace_window.resizable(0, 0)
+        replace_window.grab_current()
+
+        replace_window.columnconfigure(0, weight=1)
+        replace_window.columnconfigure(1, weight=3)
+        replace_window.columnconfigure(2, weight=1)
+
+        replace_window.rowconfigure(0, weight=1)
+        replace_window.rowconfigure(1, weight=1)
+
+        replace_what_label = ttk.Label(replace_window, text="Find What")
+        replace_what_input = ttk.Entry(replace_window)
+        replace_what_input.grid(column=1, row=0, sticky=EW)
+        replace_what_label.grid(column=0, row=0, sticky=EW)
+
+        replace_with_label = ttk.Label(replace_window, text="Replace With")
+        replace_with_input = ttk.Entry(replace_window)
+        replace_with_label.grid(column=0, row=1, sticky=EW)
+        replace_with_input.grid(column=1, row=1, sticky=EW)
+
+        replace_btn = ttk.Button(replace_window, text="Replace/ Replace Next")
+        replace_btn.grid(column=2, row=0, sticky=EW, padx=20)
+
+        replace_all = ttk.Button(replace_window, text="Replace All")
+        replace_all.grid(column=2, row=1, sticky=EW, padx=20)
+
+        # events
+        replace_btn["command"] = lambda: self.replace_algorithm(
+            replace_what_input, replace_with_input.get())
+
+    def replace_algorithm(self, find_word, replace_word):
+        start = None
+        end = None
+
+        def callback(s, e):
+            global start
+            global end
+            start = s
+            end = e
+
+        self.find_word(find_word, callback)
+
+        if not start == None and not end == None:
+            print("did run")
+            self.textarea.tag_add("replaceable", start, end)
+            self.textarea.tag_config("replaceable", text=replace_word)
+
+    def Go_to():
         pass

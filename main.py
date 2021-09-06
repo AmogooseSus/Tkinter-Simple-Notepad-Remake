@@ -53,7 +53,6 @@ class App(Tk):
         return change_val
 
 
-# test
 if __name__ == "__main__":
     app = App()
     app.mainloop()
